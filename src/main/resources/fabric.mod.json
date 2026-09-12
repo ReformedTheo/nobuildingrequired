@@ -1,0 +1,37 @@
+{
+	"schemaVersion": 1,
+	"id": "nobuildingrequired",
+	"version": "${version}",
+	"name": "NoBuildingRequired",
+	"description": "Put the materials in an Architect Table, get a blueprint, place it, and watch the build appear. Uses Litematica for the preview and the paste.",
+	"authors": [
+		"reformedtheo"
+	],
+	"license": "CC0-1.0",
+	"icon": "assets/nobuildingrequired/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"reformedtheo.nbr.NoBuildingRequired"
+		],
+		"client": [
+			"reformedtheo.nbr.client.NoBuildingRequiredClient"
+		]
+	},
+	"mixins": [
+		"nobuildingrequired.mixins.json",
+		{
+			"config": "nobuildingrequired.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"suggests": {
+		"litematica": "*"
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

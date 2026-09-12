@@ -1,0 +1,9 @@
+{
+  "block.nobuildingrequired.architect_table": "Architect Table",
+  "container.nobuildingrequired.architect_table": "Architect Table",
+  "item.nobuildingrequired.blueprint": "Blueprint",
+  "item.nobuildingrequired.blueprint.schematic": "Schematic: %s",
+  "screen.nobuildingrequired.architect_table.no_catalog": "Catalog is empty",
+  "screen.nobuildingrequired.architect_table.none_selected": "Nothing selected",
+  "screen.nobuildingrequired.architect_table.generate": "Generate"
+}

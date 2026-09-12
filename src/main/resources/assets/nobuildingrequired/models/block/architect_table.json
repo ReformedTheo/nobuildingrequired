@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/orientable_with_bottom",
+  "textures": {
+    "top": "nobuildingrequired:block/architect_table_top",
+    "bottom": "nobuildingrequired:block/architect_table_bottom",
+    "side": "nobuildingrequired:block/architect_table_side",
+    "front": "nobuildingrequired:block/architect_table_front"
+  }
+}

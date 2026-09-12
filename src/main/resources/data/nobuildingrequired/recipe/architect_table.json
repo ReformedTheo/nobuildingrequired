@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "key": {
+    "#": "#minecraft:planks",
+    "@": "minecraft:paper",
+    "D": "minecraft:diamond",
+    "T": "minecraft:smithing_table"
+  },
+  "pattern": [
+    "@@@",
+    "DTD",
+    "###"
+  ],
+  "result": {
+    "id": "nobuildingrequired:architect_table"
+  }
+}

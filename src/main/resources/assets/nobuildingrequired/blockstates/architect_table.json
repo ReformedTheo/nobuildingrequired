@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "nobuildingrequired:block/architect_table" },
+    "facing=east":  { "model": "nobuildingrequired:block/architect_table", "y": 90 },
+    "facing=south": { "model": "nobuildingrequired:block/architect_table", "y": 180 },
+    "facing=west":  { "model": "nobuildingrequired:block/architect_table", "y": 270 }
+  }
+}
