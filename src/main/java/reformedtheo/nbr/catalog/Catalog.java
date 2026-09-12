@@ -86,39 +86,40 @@ public record Catalog(List<Entry> entries) {
 
 	private static Catalog fromMap(Map<String, Map<String, Integer>> map) {
 		List<Entry> entries = map.entrySet().stream()
-				.map(e -> new Entry(e.getKey(), resolveItems(e.getKey(), e.getValue())))
+				.map(e -> new Entry(e.getKey(), Map.copyOf(resolveItems(e.getKey(), e.getValue()))))
 				.sorted(Comparator.comparing(Entry::schematic))
 				.toList();
 
 		return new Catalog(entries);
 	}
 
-	private static Map<Item, Integer> resolveItems(String schematic, Map<String, Integer> ingredients) {
+	/** Resolve ids no registro; desconhecido (rename da Mojang, mod removido) é descartado com aviso. */
+	public static Map<Item, Integer> resolveItems(String context, Map<String, Integer> counts) {
 		Map<Item, Integer> items = new LinkedHashMap<>();
 
-		ingredients.forEach((id, count) -> {
+		counts.forEach((id, count) -> {
 			Identifier key = Identifier.tryParse(id);
 			Item item = key == null ? null : BuiltInRegistries.ITEM.getOptional(key).orElse(null);
 
 			if (item == null) {
-				NoBuildingRequired.LOGGER.warn("{}: item desconhecido '{}', ignorando", schematic, id);
+				NoBuildingRequired.LOGGER.warn("{}: item desconhecido '{}', ignorando", context, id);
 			} else {
 				items.merge(item, count, Integer::sum);
 			}
 		});
 
-		return Map.copyOf(items);
+		return items;
+	}
+
+	public static Map<String, Integer> toIds(Map<Item, Integer> items) {
+		Map<String, Integer> ids = new LinkedHashMap<>();
+		items.forEach((item, count) -> ids.put(BuiltInRegistries.ITEM.getKey(item).toString(), count));
+		return ids;
 	}
 
 	private static Map<String, Map<String, Integer>> toMap(Catalog catalog) {
 		Map<String, Map<String, Integer>> map = new LinkedHashMap<>();
-
-		for (Entry entry : catalog.entries()) {
-			Map<String, Integer> ingredients = new LinkedHashMap<>();
-			entry.ingredients().forEach((item, count) -> ingredients.put(BuiltInRegistries.ITEM.getKey(item).toString(), count));
-			map.put(entry.schematic(), ingredients);
-		}
-
+		catalog.entries().forEach(e -> map.put(e.schematic(), toIds(e.ingredients())));
 		return map;
 	}
 }

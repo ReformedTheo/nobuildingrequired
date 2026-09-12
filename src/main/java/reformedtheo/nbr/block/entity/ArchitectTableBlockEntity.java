@@ -11,7 +11,6 @@ import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
@@ -38,8 +37,8 @@ import reformedtheo.nbr.menu.ArchitectTableMenu;
 public class ArchitectTableBlockEntity extends BaseContainerBlockEntity implements ExtendedMenuProvider<BlockPos> {
 	public static final int SLOTS = 27;
 
-	private static final Codec<Map<Item, Integer>> LEDGER_CODEC = Codec
-			.unboundedMap(BuiltInRegistries.ITEM.byNameCodec(), Codec.INT);
+	// Ids como texto: um item renomeado pela Mojang perde só a entrada dele, não o ledger inteiro
+	private static final Codec<Map<String, Integer>> LEDGER_CODEC = Codec.unboundedMap(Codec.STRING, Codec.INT);
 
 	private NonNullList<ItemStack> items = NonNullList.withSize(SLOTS, ItemStack.EMPTY);
 	private String schematic = "";
@@ -147,7 +146,7 @@ public class ArchitectTableBlockEntity extends BaseContainerBlockEntity implemen
 		super.saveAdditional(output);
 		ContainerHelper.saveAllItems(output, items);
 		output.putString("Schematic", schematic);
-		output.store("Delivered", LEDGER_CODEC, delivered);
+		output.store("Delivered", LEDGER_CODEC, Catalog.toIds(delivered));
 	}
 
 	@Override
@@ -156,7 +155,8 @@ public class ArchitectTableBlockEntity extends BaseContainerBlockEntity implemen
 		items = NonNullList.withSize(SLOTS, ItemStack.EMPTY);
 		ContainerHelper.loadAllItems(input, items);
 		schematic = input.getStringOr("Schematic", "");
-		delivered = new HashMap<>(input.read("Delivered", LEDGER_CODEC).orElse(Map.of()));
+		delivered = new HashMap<>(Catalog.resolveItems("Architect Table " + worldPosition.toShortString(),
+				input.read("Delivered", LEDGER_CODEC).orElse(Map.of())));
 	}
 
 	// O cliente recebe schematic + ledger pra tela mostrar have/need
