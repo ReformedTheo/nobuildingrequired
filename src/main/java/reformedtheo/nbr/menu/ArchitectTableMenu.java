@@ -1,13 +1,12 @@
 package reformedtheo.nbr.menu;
 
-import java.util.Map;
+import java.util.Comparator;
+import java.util.List;
 
-import net.minecraft.world.Container;
-import net.minecraft.world.SimpleContainer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.DataSlot;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -24,23 +23,27 @@ public class ArchitectTableMenu extends AbstractContainerMenu {
 	private static final int TABLE_SLOTS = ArchitectTableBlockEntity.SLOTS;
 	private static final int COLUMNS = 9;
 
-	private final Container table;
-	private final DataSlot selected;
+	/** Um ingrediente da receita selecionada e quanto já foi entregue. */
+	public record Requirement(Item item, int have, int need) {
+		public boolean done() {
+			return have >= need;
+		}
 
-	/** Lado do cliente: o conteúdo e a seleção chegam do servidor depois. */
-	public ArchitectTableMenu(int containerId, Inventory playerInventory) {
-		this(containerId, playerInventory, new SimpleContainer(TABLE_SLOTS), DataSlot.standalone());
+		public int remaining() {
+			return need - have;
+		}
+	}
+
+	private final ArchitectTableBlockEntity table;
+
+	/** Lado do cliente: o block entity já está sincronizado nessa posição. */
+	public ArchitectTableMenu(int containerId, Inventory playerInventory, BlockPos pos) {
+		this(containerId, playerInventory, tableAt(playerInventory, pos));
 	}
 
 	public ArchitectTableMenu(int containerId, Inventory playerInventory, ArchitectTableBlockEntity table) {
-		this(containerId, playerInventory, table, selectionOf(table));
-	}
-
-	private ArchitectTableMenu(int containerId, Inventory playerInventory, Container table, DataSlot selected) {
 		super(ModMenus.ARCHITECT_TABLE, containerId);
-		checkContainerSize(table, TABLE_SLOTS);
 		this.table = table;
-		this.selected = addDataSlot(selected);
 		table.startOpen(playerInventory.player);
 
 		for (int index = 0; index < TABLE_SLOTS; index++) {
@@ -52,60 +55,40 @@ public class ArchitectTableMenu extends AbstractContainerMenu {
 		addStandardInventorySlots(playerInventory, 8, 84);
 	}
 
-	/** O block entity guarda o nome; o menu sincroniza o índice no catálogo. */
-	private static DataSlot selectionOf(ArchitectTableBlockEntity table) {
-		return new DataSlot() {
-			@Override
-			public int get() {
-				return Catalog.current().indexOf(table.schematic());
-			}
+	private static ArchitectTableBlockEntity tableAt(Inventory playerInventory, BlockPos pos) {
+		if (playerInventory.player.level().getBlockEntity(pos) instanceof ArchitectTableBlockEntity table) {
+			return table;
+		}
 
-			@Override
-			public void set(int index) {
-				table.setSchematic(Catalog.current().get(index).schematic());
-			}
-		};
+		throw new IllegalStateException("Não tem Architect Table em " + pos);
 	}
 
 	/** Índice no catálogo, ou -1 se nada selecionado. */
 	public int selectedIndex() {
-		return selected.get();
+		return Catalog.current().indexOf(table.schematic());
 	}
 
 	public Catalog.Entry selectedEntry() {
-		int index = selectedIndex();
-		Catalog catalog = Catalog.current();
-		return index >= 0 && index < catalog.size() ? catalog.get(index) : null;
+		return table.selectedEntry();
 	}
 
-	public int countInTable(Item item) {
-		int total = 0;
+	/** Faltantes primeiro (maior falta no topo), depois os completos. */
+	public List<Requirement> requirements() {
+		Catalog.Entry entry = selectedEntry();
 
-		for (int index = 0; index < TABLE_SLOTS; index++) {
-			ItemStack stack = table.getItem(index);
-
-			if (stack.is(item)) {
-				total += stack.getCount();
-			}
+		if (entry == null) {
+			return List.of();
 		}
 
-		return total;
+		return entry.ingredients().entrySet().stream()
+				.map(e -> new Requirement(e.getKey(), table.delivered(e.getKey()), e.getValue()))
+				.sorted(Comparator.comparing(Requirement::done).thenComparing(Requirement::remaining, Comparator.reverseOrder()))
+				.toList();
 	}
 
 	public boolean canGenerate() {
 		Catalog.Entry entry = selectedEntry();
-
-		if (entry == null) {
-			return false;
-		}
-
-		for (Map.Entry<Item, Integer> ingredient : entry.ingredients().entrySet()) {
-			if (countInTable(ingredient.getKey()) < ingredient.getValue()) {
-				return false;
-			}
-		}
-
-		return true;
+		return entry != null && requirements().stream().allMatch(Requirement::done);
 	}
 
 	/** Chamado no servidor quando o cliente clica num botão. */
@@ -115,11 +98,13 @@ public class ArchitectTableMenu extends AbstractContainerMenu {
 			return generate(player);
 		}
 
-		if (id < 0 || id >= Catalog.current().size()) {
+		Catalog catalog = Catalog.current();
+
+		if (id < 0 || id >= catalog.size()) {
 			return false;
 		}
 
-		selected.set(id);
+		table.setSchematic(catalog.get(id).schematic());
 		return true;
 	}
 
@@ -129,22 +114,12 @@ public class ArchitectTableMenu extends AbstractContainerMenu {
 		}
 
 		Catalog.Entry entry = selectedEntry();
-		entry.ingredients().forEach(this::removeFromTable);
+		table.consume(entry.ingredients());
 
 		ItemStack blueprint = new ItemStack(ModItems.BLUEPRINT);
 		blueprint.set(ModDataComponents.SCHEMATIC, entry.schematic());
 		player.getInventory().placeItemBackInInventory(blueprint);
 		return true;
-	}
-
-	private void removeFromTable(Item item, int amount) {
-		int remaining = amount;
-
-		for (int index = 0; index < TABLE_SLOTS && remaining > 0; index++) {
-			if (table.getItem(index).is(item)) {
-				remaining -= table.removeItem(index, remaining).getCount();
-			}
-		}
 	}
 
 	@Override

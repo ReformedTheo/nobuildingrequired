@@ -1,0 +1,3 @@
+[submodule "jsonmatica"]
+	path = jsonmatica
+	url = https://github.com/ReformedTheo/jsonmatica.git

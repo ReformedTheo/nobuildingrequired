@@ -15,6 +15,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
 
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 
 import reformedtheo.nbr.NoBuildingRequired;
@@ -26,8 +27,9 @@ public record Catalog(List<Entry> entries) {
 
 	public static final String RESOURCE = "/nobuildingrequired/catalog.json";
 
+	// Ids ficam como String: item desconhecido só gera aviso, não derruba o catálogo inteiro
 	public static final Codec<Catalog> CODEC = Codec
-			.unboundedMap(Codec.STRING, Codec.unboundedMap(BuiltInRegistries.ITEM.byNameCodec(), Codec.INT))
+			.unboundedMap(Codec.STRING, Codec.unboundedMap(Codec.STRING, Codec.INT))
 			.xmap(Catalog::fromMap, Catalog::toMap);
 
 	private static Catalog current;
@@ -58,6 +60,12 @@ public record Catalog(List<Entry> entries) {
 		return -1;
 	}
 
+	/** Entrada pelo nome, ou null se não existe. */
+	public Entry entry(String schematic) {
+		int index = indexOf(schematic);
+		return index >= 0 ? entries.get(index) : null;
+	}
+
 	private static Catalog load() {
 		try (InputStream in = Catalog.class.getResourceAsStream(RESOURCE)) {
 			if (in == null) {
@@ -76,18 +84,41 @@ public record Catalog(List<Entry> entries) {
 		}
 	}
 
-	private static Catalog fromMap(Map<String, Map<Item, Integer>> map) {
+	private static Catalog fromMap(Map<String, Map<String, Integer>> map) {
 		List<Entry> entries = map.entrySet().stream()
-				.map(e -> new Entry(e.getKey(), Map.copyOf(e.getValue())))
+				.map(e -> new Entry(e.getKey(), resolveItems(e.getKey(), e.getValue())))
 				.sorted(Comparator.comparing(Entry::schematic))
 				.toList();
 
 		return new Catalog(entries);
 	}
 
-	private static Map<String, Map<Item, Integer>> toMap(Catalog catalog) {
-		Map<String, Map<Item, Integer>> map = new LinkedHashMap<>();
-		catalog.entries().forEach(e -> map.put(e.schematic(), e.ingredients()));
+	private static Map<Item, Integer> resolveItems(String schematic, Map<String, Integer> ingredients) {
+		Map<Item, Integer> items = new LinkedHashMap<>();
+
+		ingredients.forEach((id, count) -> {
+			Identifier key = Identifier.tryParse(id);
+			Item item = key == null ? null : BuiltInRegistries.ITEM.getOptional(key).orElse(null);
+
+			if (item == null) {
+				NoBuildingRequired.LOGGER.warn("{}: item desconhecido '{}', ignorando", schematic, id);
+			} else {
+				items.merge(item, count, Integer::sum);
+			}
+		});
+
+		return Map.copyOf(items);
+	}
+
+	private static Map<String, Map<String, Integer>> toMap(Catalog catalog) {
+		Map<String, Map<String, Integer>> map = new LinkedHashMap<>();
+
+		for (Entry entry : catalog.entries()) {
+			Map<String, Integer> ingredients = new LinkedHashMap<>();
+			entry.ingredients().forEach((item, count) -> ingredients.put(BuiltInRegistries.ITEM.getKey(item).toString(), count));
+			map.put(entry.schematic(), ingredients);
+		}
+
 		return map;
 	}
 }

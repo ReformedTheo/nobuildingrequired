@@ -42,6 +42,12 @@ dependencies {
 }
 
 processResources {
+	// Conteúdo (catalog.json + schematics) vem do submodule jsonmatica
+	from("jsonmatica") {
+		include "catalog.json", "schematics/**"
+		into "nobuildingrequired"
+	}
+
 	def version = project.version
 	inputs.property "version", version
 

@@ -5,5 +5,7 @@
   "item.nobuildingrequired.blueprint.schematic": "Schematic: %s",
   "screen.nobuildingrequired.architect_table.no_catalog": "Catalog is empty",
   "screen.nobuildingrequired.architect_table.none_selected": "Nothing selected",
+  "screen.nobuildingrequired.architect_table.progress": "%s / %s materials",
+  "screen.nobuildingrequired.architect_table.complete": "Ready to generate",
   "screen.nobuildingrequired.architect_table.generate": "Generate"
 }

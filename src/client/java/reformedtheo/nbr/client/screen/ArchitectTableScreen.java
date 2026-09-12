@@ -1,6 +1,6 @@
 package reformedtheo.nbr.client.screen;
 
-import java.util.Map;
+import java.util.List;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -9,11 +9,11 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 import reformedtheo.nbr.catalog.Catalog;
 import reformedtheo.nbr.menu.ArchitectTableMenu;
+import reformedtheo.nbr.menu.ArchitectTableMenu.Requirement;
 
 public class ArchitectTableScreen extends AbstractContainerScreen<ArchitectTableMenu> {
 	// Textura do baú da vanilla: 3 fileiras em cima, inventário do jogador a partir de v=126.
@@ -26,13 +26,17 @@ public class ArchitectTableScreen extends AbstractContainerScreen<ArchitectTable
 	private static final int PANEL_WIDTH = 120;
 	private static final int PANEL_PADDING = 6;
 	private static final int LINE_HEIGHT = 18;
+	private static final int LIST_TOP = 48;
+	private static final int VISIBLE_LINES = 5;
 
 	private static final int WHITE = 0xFFFFFFFF;
+	private static final int GRAY = 0xFFAAAAAA;
 	private static final int GREEN = 0xFF55FF55;
 	private static final int RED = 0xFFFF5555;
 	private static final int PANEL_BACKGROUND = 0xC0101010;
 
 	private int panelLeft;
+	private int scroll;
 	private Button generate;
 
 	public ArchitectTableScreen(ArchitectTableMenu menu, Inventory playerInventory, Component title) {
@@ -65,7 +69,7 @@ public class ArchitectTableScreen extends AbstractContainerScreen<ArchitectTable
 		minecraft.gameMode.handleInventoryButtonClick(menu.containerId, ArchitectTableMenu.BUTTON_GENERATE);
 	}
 
-	/** Avança ou volta no catálogo. O servidor valida e sincroniza de volta pelo DataSlot. */
+	/** Avança ou volta no catálogo. O servidor valida e o block entity sincroniza de volta. */
 	private void select(int delta) {
 		int size = Catalog.current().size();
 
@@ -75,6 +79,25 @@ public class ArchitectTableScreen extends AbstractContainerScreen<ArchitectTable
 
 		int next = Math.floorMod(menu.selectedIndex() + delta, size);
 		minecraft.gameMode.handleInventoryButtonClick(menu.containerId, next);
+		scroll = 0;
+	}
+
+	private List<Requirement> missing() {
+		return menu.requirements().stream().filter(r -> !r.done()).toList();
+	}
+
+	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+		boolean overPanel = mouseX >= panelLeft && mouseX < panelLeft + PANEL_WIDTH
+				&& mouseY >= topPos && mouseY < topPos + imageHeight;
+
+		if (!overPanel) {
+			return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+		}
+
+		int max = Math.max(0, missing().size() - VISIBLE_LINES);
+		scroll = Math.clamp(scroll - (int) Math.signum(scrollY), 0, max);
+		return true;
 	}
 
 	@Override
@@ -88,34 +111,45 @@ public class ArchitectTableScreen extends AbstractContainerScreen<ArchitectTable
 	private void extractPanel(GuiGraphicsExtractor graphics) {
 		graphics.fill(panelLeft, topPos, panelLeft + PANEL_WIDTH, topPos + imageHeight, PANEL_BACKGROUND);
 
-		Catalog catalog = Catalog.current();
 		int x = panelLeft + PANEL_PADDING;
 		int y = topPos + PANEL_PADDING + 6;
 
-		if (catalog.size() == 0) {
+		if (Catalog.current().size() == 0) {
 			graphics.text(font, Component.translatable("screen.nobuildingrequired.architect_table.no_catalog"), x, y, RED);
 			return;
 		}
 
-		int index = menu.selectedIndex();
+		Catalog.Entry entry = menu.selectedEntry();
 
-		if (index < 0 || index >= catalog.size()) {
+		if (entry == null) {
 			graphics.text(font, Component.translatable("screen.nobuildingrequired.architect_table.none_selected"), x + 22, y, WHITE);
 			return;
 		}
 
-		Catalog.Entry entry = catalog.get(index);
 		graphics.text(font, entry.schematic(), x + 22, y, WHITE);
 
-		y += 24;
+		List<Requirement> all = menu.requirements();
+		List<Requirement> missing = missing();
+		long done = all.size() - missing.size();
+		y = topPos + PANEL_PADDING + 26;
+		graphics.text(font, Component.translatable("screen.nobuildingrequired.architect_table.progress", done, all.size()), x, y, GRAY);
 
-		for (Map.Entry<Item, Integer> ingredient : entry.ingredients().entrySet()) {
-			int have = menu.countInTable(ingredient.getKey());
-			int need = ingredient.getValue();
+		if (missing.isEmpty()) {
+			graphics.text(font, Component.translatable("screen.nobuildingrequired.architect_table.complete"), x, y + LINE_HEIGHT, GREEN);
+			return;
+		}
 
-			graphics.item(new ItemStack(ingredient.getKey()), x, y);
-			graphics.text(font, have + " / " + need, x + 20, y + 4, have >= need ? GREEN : RED);
+		y = topPos + LIST_TOP;
+		int end = Math.min(missing.size(), scroll + VISIBLE_LINES);
+
+		for (Requirement r : missing.subList(scroll, end)) {
+			graphics.item(new ItemStack(r.item()), x, y);
+			graphics.text(font, r.have() + " / " + r.need(), x + 20, y + 4, RED);
 			y += LINE_HEIGHT;
+		}
+
+		if (missing.size() > VISIBLE_LINES) {
+			graphics.text(font, (scroll + 1) + "-" + end + " / " + missing.size(), x, y + 2, GRAY);
 		}
 	}
 }
