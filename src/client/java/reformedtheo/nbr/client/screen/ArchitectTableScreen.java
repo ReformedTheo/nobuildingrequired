@@ -38,6 +38,8 @@ public class ArchitectTableScreen extends AbstractContainerScreen<ArchitectTable
 	private int panelLeft;
 	private int scroll;
 	private Button generate;
+	/** Linhas desenhadas no último frame, pra achar o item sob o mouse. */
+	private List<Requirement> visible = List.of();
 
 	public ArchitectTableScreen(ArchitectTableMenu menu, Inventory playerInventory, Component title) {
 		super(menu, playerInventory, title, 176, TOP_HEIGHT + BOTTOM_HEIGHT);
@@ -101,6 +103,23 @@ public class ArchitectTableScreen extends AbstractContainerScreen<ArchitectTable
 	}
 
 	@Override
+	protected void extractTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+		super.extractTooltip(graphics, mouseX, mouseY);
+
+		int x = panelLeft + PANEL_PADDING;
+		int width = PANEL_WIDTH - 2 * PANEL_PADDING;
+
+		for (int i = 0; i < visible.size(); i++) {
+			int y = topPos + LIST_TOP + i * LINE_HEIGHT;
+
+			if (mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + LINE_HEIGHT) {
+				graphics.setTooltipForNextFrame(font, new ItemStack(visible.get(i).item()), mouseX, mouseY);
+				return;
+			}
+		}
+	}
+
+	@Override
 	public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
 		super.extractBackground(graphics, mouseX, mouseY, partialTick);
 		graphics.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND, leftPos, topPos, 0, 0, imageWidth, TOP_HEIGHT, 256, 256);
@@ -135,14 +154,16 @@ public class ArchitectTableScreen extends AbstractContainerScreen<ArchitectTable
 		graphics.text(font, Component.translatable("screen.nobuildingrequired.architect_table.progress", done, all.size()), x, y, GRAY);
 
 		if (missing.isEmpty()) {
+			visible = List.of();
 			graphics.text(font, Component.translatable("screen.nobuildingrequired.architect_table.complete"), x, y + LINE_HEIGHT, GREEN);
 			return;
 		}
 
 		y = topPos + LIST_TOP;
 		int end = Math.min(missing.size(), scroll + VISIBLE_LINES);
+		visible = missing.subList(scroll, end);
 
-		for (Requirement r : missing.subList(scroll, end)) {
+		for (Requirement r : visible) {
 			graphics.item(new ItemStack(r.item()), x, y);
 			graphics.text(font, r.have() + " / " + r.need(), x + 20, y + 4, RED);
 			y += LINE_HEIGHT;
